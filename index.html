@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>弱网离线请求队列 · Offline Request Queue</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>弱网请求队列 <span class="subtitle">Fetch / AbortController / Service Worker / IndexedDB / BroadcastChannel / Canvas</span></h1>
+    <div class="net-status" id="netStatus" title="浏览器 online 事件 + 心跳探测双重判定">
+      <span class="dot" id="netDot"></span>
+      <span id="netLabel">检测中…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 左列：发起请求 + 模拟控制 -->
+    <section class="col">
+      <section class="card">
+        <h2>发起请求</h2>
+        <form id="requestForm">
+          <div class="form-row">
+            <label>方法
+              <select id="reqMethod">
+                <option>GET</option>
+                <option selected>POST</option>
+                <option>PUT</option>
+                <option>DELETE</option>
+              </select>
+            </label>
+            <label class="grow">路径
+              <select id="reqPath" list="pathList">
+                <option value="/api/echo">/api/echo —— 回显（默认成功）</option>
+                <option value="/api/tasks">/api/tasks —— 任务列表</option>
+                <option value="/api/error">/api/error —— 500（可重试）</option>
+                <option value="/api/notfound">/api/notfound —— 404（不重试）</option>
+                <option value="/api/flaky">/api/flaky —— 50% 随机失败</option>
+              </select>
+            </label>
+          </div>
+          <label>请求体（POST/PUT 生效，JSON）
+            <textarea id="reqBody" rows="4">{"title": "离线消息"}</textarea>
+          </label>
+          <div class="form-row btn-row">
+            <button type="submit" class="primary">加入队列</button>
+            <button type="button" id="btnFlush" class="ghost">立即重放</button>
+          </div>
+        </form>
+        <p class="hint" id="enqueueHint"></p>
+      </section>
+
+      <section class="card">
+        <h2>弱网模拟 <span class="tag">Service Worker</span></h2>
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="forceOffline" />
+            <span>强制离线（mock 层，SW 直接返回 503）</span>
+          </label>
+        </div>
+        <label>mock 失败率：<output id="failRateOut">0%</output>
+          <input type="range" id="failRate" min="0" max="100" value="0" />
+        </label>
+        <label>mock 延迟：<output id="latencyOut">150ms</output>
+          <input type="range" id="latency" min="0" max="3000" step="50" value="150" />
+        </label>
+        <p class="hint">失败率只影响 Service Worker 的 mock 响应；真实离线时浏览器 fetch 直接失败。心跳每 5s 探测一次 <code>/api/ping</code>，配合 <code>online/offline</code> 事件双重判定。</p>
+      </section>
+
+      <section class="card">
+        <h2>队列设置</h2>
+        <label>最大队列长度（超过后丢弃最旧的排队项）
+          <input type="number" id="maxQueue" min="1" max="999" value="10" />
+        </label>
+        <label>去重窗口：<output id="dedupOut">60</output> 秒（相同 方法+路径+内容 在窗口内自动去重）
+          <input type="range" id="dedupWindow" min="0" max="600" step="5" value="60" />
+        </label>
+      </section>
+    </section>
+
+    <!-- 中列：队列 -->
+    <section class="col">
+      <section class="card stats-card">
+        <h2>请求队列</h2>
+        <div class="stats" id="stats">
+          <div class="stat"><strong id="statQueued">0</strong><span>排队</span></div>
+          <div class="stat"><strong id="statSending">0</strong><span>发送中</span></div>
+          <div class="stat"><strong id="statFailed">0</strong><span>失败</span></div>
+          <div class="stat"><strong id="statDone">0</strong><span>成功</span></div>
+          <div class="stat"><strong id="statDropped">0</strong><span>已截断/取消</span></div>
+        </div>
+        <div class="form-row btn-row">
+          <button id="btnClearQueue" class="danger-ghost">清空队列</button>
+        </div>
+      </section>
+      <section class="card list-card">
+        <ul class="item-list" id="queueList"></ul>
+        <p class="empty" id="queueEmpty">队列为空 —— 离线时发起请求会在这里排队。</p>
+      </section>
+    </section>
+
+    <!-- 右列：历史 + 时序图 -->
+    <section class="col">
+      <section class="card">
+        <h2>请求历史 <span class="tag">IndexedDB 持久化</span></h2>
+        <div class="form-row btn-row">
+          <button id="btnClearHistory" class="ghost">清空历史</button>
+        </div>
+        <ul class="item-list compact" id="historyList"></ul>
+        <p class="empty" id="historyEmpty">暂无历史记录。</p>
+      </section>
+
+      <section class="card">
+        <h2>队列时序图 <span class="tag">Canvas</span></h2>
+        <div class="canvas-wrap">
+          <canvas id="timeline" width="900" height="360"></canvas>
+        </div>
+        <p class="hint">每条泳道一个请求：浅段 = 排队等待，深色段 = 发送中，结果标记 ● 成功 / ✕ 失败 / — 取消或截断；灰色背景带为离线时段。</p>
+      </section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
