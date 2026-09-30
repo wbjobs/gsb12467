@@ -1,0 +1,11 @@
+{
+  "name": "offline-request-queue",
+  "version": "1.0.0",
+  "private": true,
+  "description": "弱网环境离线排队、联网自动补偿的请求队列（无框架，Fetch + AbortController + Service Worker + IndexedDB + BroadcastChannel + Canvas）",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "test": "node test/engine.test.js"
+  }
+}

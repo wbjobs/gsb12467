@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>弱网请求队列 · 离线排队 / 联网补偿</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>弱网请求队列</h1>
+    <div class="conn" id="connIndicator" role="status" aria-live="polite">
+      <span class="conn-dot" id="connDot"></span>
+      <span id="connText">检测中…</span>
+      <span class="conn-extra" id="connExtra"></span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel panel-form" aria-labelledby="formTitle">
+      <h2 id="formTitle">发起请求</h2>
+      <div class="form-row">
+        <label for="reqMethod">方法</label>
+        <select id="reqMethod">
+          <option>POST</option>
+          <option>PUT</option>
+          <option>PATCH</option>
+          <option>DELETE</option>
+          <option>GET</option>
+        </select>
+        <label for="reqUrl" class="url-label">地址</label>
+        <input id="reqUrl" type="text" value="/api/echo" spellcheck="false" />
+      </div>
+      <label for="reqBody">请求体（JSON / 文本，可留空）</label>
+      <textarea id="reqBody" rows="3" placeholder='例如 {"orderId": "A-1001", "amount": 42}'></textarea>
+      <div class="form-actions">
+        <button id="btnEnqueue" class="primary">加入队列 / 立即发送</button>
+        <button id="btnStress" class="ghost" title="连续生成 8 条请求，用于验证去重与截断">批量压测 ×8</button>
+      </div>
+
+      <h2 class="mt">手动控制</h2>
+      <div class="form-actions wrap">
+        <button id="btnReplay">立即重放</button>
+        <button id="btnRetryFailed" class="ghost">重试全部失败</button>
+        <button id="btnClear" class="danger-ghost">清空队列</button>
+        <label class="force-offline">
+          <input type="checkbox" id="forceOffline" />
+          模拟离线（Service Worker）
+        </label>
+      </div>
+      <div class="form-row caps">
+        <label for="maxQueue">队列上限</label>
+        <input id="maxQueue" type="number" min="2" max="500" value="8" />
+        <label for="maxAttempts">最大尝试次数</label>
+        <input id="maxAttempts" type="number" min="1" max="10" value="4" />
+        <label for="failRate">服务端失败率 %</label>
+        <input id="failRate" type="number" min="0" max="100" value="0" />
+      </div>
+    </section>
+
+    <section class="panel panel-status" aria-labelledby="statusTitle">
+      <h2 id="statusTitle">队列状态</h2>
+      <div class="stats" id="stats">
+        <div class="stat"><span class="stat-num" id="statQueued">0</span><span>排队</span></div>
+        <div class="stat"><span class="stat-num" id="statRunning">0</span><span>发送中</span></div>
+        <div class="stat stat-fail"><span class="stat-num" id="statFailed">0</span><span>失败</span></div>
+        <div class="stat stat-done"><span class="stat-num" id="statDone">0</span><span>已成功</span></div>
+      </div>
+      <p class="replay-state">重放状态：<strong id="replayState">空闲</strong></p>
+      <ol class="queue-list" id="queueList" aria-label="请求队列"></ol>
+      <p class="empty-hint" id="queueEmpty">队列为空，发起请求或开启“模拟离线”后再发送即可看到排队。</p>
+    </section>
+
+    <section class="panel panel-history" aria-labelledby="historyTitle">
+      <h2 id="historyTitle">请求历史</h2>
+      <div class="form-row history-bar">
+        <label for="historyFilter">筛选</label>
+        <select id="historyFilter">
+          <option value="all">全部</option>
+          <option value="succeeded">仅成功</option>
+          <option value="failed">仅失败 / 截断</option>
+        </select>
+        <button id="btnClearHistory" class="ghost small">清空历史</button>
+      </div>
+      <ol class="history-list" id="historyList" aria-label="请求历史"></ol>
+      <p class="empty-hint" id="historyEmpty">暂无历史记录（最多保留 100 条，跨刷新持久化）。</p>
+    </section>
+
+    <section class="panel panel-timeline" aria-labelledby="timelineTitle">
+      <h2 id="timelineTitle">队列时序图（Canvas，近 60 秒）</h2>
+      <canvas id="timelineCanvas" height="320"></canvas>
+      <div class="legend">
+        <span><i class="lg lg-queued"></i>排队</span>
+        <span><i class="lg lg-attempt"></i>发送尝试</span>
+        <span><i class="lg lg-wait"></i>退避等待</span>
+        <span><i class="lg lg-offline"></i>离线窗口</span>
+        <span><i class="lg lg-success"></i>成功</span>
+        <span><i class="lg lg-fail"></i>失败</span>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+  <div class="tooltip" id="timelineTooltip" hidden></div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
